@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MGM SMART PARKING — Login</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+</head>
+
+<body>
+  <div class="glow-orb orb1"></div>
+  <div class="glow-orb orb2"></div>
+
+  <div class="container">
+    <div class="logo-area">
+      <div class="logo-icon">🅿️</div>
+      <h1>MGM <span>SMART</span> PARKING</h1>
+      <p>MGM College of Engineering, Nanded</p>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('login')">Login</button>
+        <button class="tab-btn" onclick="switchTab('signup')">Sign Up</button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div class="form-section active" id="tab-login">
+        <div class="section-title">Welcome Back 👋</div>
+        <div class="alert" id="login-alert"></div>
+        <div class="field">
+          <label>Email Address</label>
+          <input type="email" id="login-email" placeholder="you@mgmcollege.edu">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="••••••••">
+        </div>
+        <button class="btn-primary" id="login-btn" onclick="doLogin()">LOGIN TO DASHBOARD →</button>
+      </div>
+
+      <!-- SIGNUP FORM -->
+      <div class="form-section" id="tab-signup">
+        <div class="section-title">Create Account <span class="badge">FREE</span></div>
+        <div class="alert" id="signup-alert"></div>
+        <div class="form-row">
+          <div class="field">
+            <label>Full Name</label>
+            <input type="text" id="su-name" placeholder="Your full name">
+          </div>
+          <div class="field">
+            <label>Department</label>
+            <select id="su-dept">
+              <option value="">Select...</option>
+              <option>Computer Science</option>
+              <option>Mechanical</option>
+              <option>Civil</option>
+              <option>Electrical</option>
+              <option>Electronics</option>
+              <option>IT</option>
+              <option>MBA</option>
+              <option>MCA</option>
+              <option>Faculty</option>
+              <option>Staff</option>
+            </select>
+          </div>
+        </div>
+        <div class="field full">
+          <label>Email Address</label>
+          <input type="email" id="su-email" placeholder="you@mgmcollege.edu">
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label>Vehicle Number</label>
+            <input type="text" id="su-vehicle" placeholder="MH-24-XX-0000">
+          </div>
+          <div class="field">
+            <label>Vehicle Type</label>
+            <select id="su-vehicle-type">
+              <option value="two_wheeler">🛵 Two Wheeler (Bike/Scooter)</option>
+              <option value="four_wheeler">🚗 Four Wheeler (Car/SUV)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label>Phone</label>
+            <input type="tel" id="su-phone" placeholder="9XXXXXXXXX">
+          </div>
+        </div>
+        <div class="field full">
+          <label>Password</label>
+          <input type="password" id="su-password" placeholder="Min. 6 characters">
+        </div>
+        <button class="btn-primary" id="signup-btn" onclick="doSignup()">Create Account →</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Prevent back navigation to dashboard after logout
+    history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', () => history.pushState(null, '', window.location.href));
+
+    // Validation Patterns
+    const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    const PHONE_REGEX = /^[6-9]\d{9}$/;
+    const VEHICLE_REGEX = /^[a-zA-Z]{2}[-\s]?\d{2}[-\s]?[a-zA-Z]{1,2}[-\s]?\d{4}$/;
+    const NAME_REGEX = /^[a-zA-Z\s]{3,50}$/;
+
+    function setFieldStatus(elementId, isValid) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      if (isValid === true) {
+        el.classList.remove('invalid');
+        el.classList.add('valid');
+      } else if (isValid === false) {
+        el.classList.remove('valid');
+        el.classList.add('invalid');
+      } else {
+        el.classList.remove('valid', 'invalid');
+      }
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'signup'));
+      });
+      document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+      document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+
+      // Clear all validation styles and alerts when switching tabs
+      const fields = ['login-email', 'login-password', 'su-name', 'su-dept', 'su-email', 'su-vehicle', 'su-phone', 'su-password'];
+      fields.forEach(f => setFieldStatus(f, null));
+      document.getElementById('login-alert').className = 'alert';
+      document.getElementById('signup-alert').className = 'alert';
+    }
+
+    function showAlert(id, msg, type) {
+      const el = document.getElementById(id);
+      el.textContent = msg;
+      el.className = `alert ${type} show`;
+      setTimeout(() => el.classList.remove('show'), 4000);
+    }
+
+    async function doLogin() {
+      const btn = document.getElementById('login-btn');
+      const emailEl = document.getElementById('login-email');
+      const passwordEl = document.getElementById('login-password');
+
+      const email = emailEl.value.trim();
+      const password = passwordEl.value;
+
+      // Validation
+      let hasError = false;
+
+      if (!email) {
+        setFieldStatus('login-email', false);
+        hasError = true;
+      } else if (!EMAIL_REGEX.test(email)) {
+        setFieldStatus('login-email', false);
+        hasError = true;
+        showAlert('login-alert', 'Please enter a valid email address.', 'error');
+      } else {
+        setFieldStatus('login-email', true);
+      }
+
+      if (!password) {
+        setFieldStatus('login-password', false);
+        hasError = true;
+      } else {
+        setFieldStatus('login-password', true);
+      }
+
+      if (hasError) {
+        if (!email || !password) {
+          showAlert('login-alert', 'Please fill all required fields.', 'error');
+        }
+        return;
+      }
+
+      btn.disabled = true; btn.textContent = 'Logging in...';
+      try {
+        const res = await fetch('/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showAlert('login-alert', 'Login successful! Redirecting...', 'success');
+          setTimeout(() => window.location.href = '/dashboard', 800);
+        } else {
+          showAlert('login-alert', data.message, 'error');
+          setFieldStatus('login-email', false);
+          setFieldStatus('login-password', false);
+          btn.disabled = false; btn.textContent = 'Login to Dashboard →';
+        }
+      } catch (e) {
+        showAlert('login-alert', 'Server error. Is Flask running?', 'error');
+        btn.disabled = false; btn.textContent = 'Login to Dashboard →';
+      }
+    }
+
+    async function doSignup() {
+      const btn = document.getElementById('signup-btn');
+      const nameEl = document.getElementById('su-name');
+      const deptEl = document.getElementById('su-dept');
+      const emailEl = document.getElementById('su-email');
+      const vehicleEl = document.getElementById('su-vehicle');
+      const typeEl = document.getElementById('su-vehicle-type');
+      const phoneEl = document.getElementById('su-phone');
+      const passwordEl = document.getElementById('su-password');
+
+      const payload = {
+        full_name: nameEl.value.trim(),
+        email: emailEl.value.trim(),
+        password: passwordEl.value,
+        vehicle_no: vehicleEl.value.trim(),
+        vehicle_type: typeEl.value,
+        phone: phoneEl.value.trim(),
+        department: deptEl.value,
+      };
+
+      let hasError = false;
+
+      // Name
+      if (!payload.full_name || !NAME_REGEX.test(payload.full_name)) {
+        setFieldStatus('su-name', false);
+        hasError = true;
+      } else {
+        setFieldStatus('su-name', true);
+      }
+
+      // Department
+      if (!payload.department) {
+        setFieldStatus('su-dept', false);
+        hasError = true;
+      } else {
+        setFieldStatus('su-dept', true);
+      }
+
+      // Email
+      if (!payload.email || !EMAIL_REGEX.test(payload.email)) {
+        setFieldStatus('su-email', false);
+        hasError = true;
+      } else {
+        setFieldStatus('su-email', true);
+      }
+
+      // Vehicle
+      if (!payload.vehicle_no || !VEHICLE_REGEX.test(payload.vehicle_no)) {
+        setFieldStatus('su-vehicle', false);
+        hasError = true;
+      } else {
+        setFieldStatus('su-vehicle', true);
+      }
+
+      // Phone
+      if (!payload.phone || !PHONE_REGEX.test(payload.phone)) {
+        setFieldStatus('su-phone', false);
+        hasError = true;
+      } else {
+        setFieldStatus('su-phone', true);
+      }
+
+      // Password
+      if (!payload.password || payload.password.length < 6) {
+        setFieldStatus('su-password', false);
+        hasError = true;
+      } else {
+        setFieldStatus('su-password', true);
+      }
+
+      if (hasError) {
+        if (!payload.full_name || !payload.department || !payload.email || !payload.vehicle_no || !payload.phone || !payload.password) {
+          showAlert('signup-alert', 'Please fill all required fields.', 'error');
+        } else if (!NAME_REGEX.test(payload.full_name)) {
+          showAlert('signup-alert', 'Name must be at least 3 letters, containing only alphabets.', 'error');
+        } else if (!EMAIL_REGEX.test(payload.email)) {
+          showAlert('signup-alert', 'Please enter a valid email address.', 'error');
+        } else if (!VEHICLE_REGEX.test(payload.vehicle_no)) {
+          showAlert('signup-alert', 'Invalid vehicle number. Format: MH-24-XX-0000', 'error');
+        } else if (!PHONE_REGEX.test(payload.phone)) {
+          showAlert('signup-alert', 'Phone number must be a valid 10-digit number starting with 6-9.', 'error');
+        } else if (payload.password.length < 6) {
+          showAlert('signup-alert', 'Password must be at least 6 characters.', 'error');
+        }
+        return;
+      }
+
+      btn.disabled = true; btn.textContent = 'Creating account...';
+      try {
+        const res = await fetch('/signup', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showAlert('signup-alert', data.message, 'success');
+          const signupFields = ['su-name', 'su-dept', 'su-email', 'su-vehicle', 'su-phone', 'su-password'];
+          signupFields.forEach(f => setFieldStatus(f, null));
+          setTimeout(() => switchTab('login'), 1500);
+          btn.disabled = false; btn.textContent = 'Create Account →';
+        } else {
+          showAlert('signup-alert', data.message, 'error');
+          if (data.message.toLowerCase().includes('email')) {
+            setFieldStatus('su-email', false);
+          }
+          btn.disabled = false; btn.textContent = 'Create Account →';
+        }
+      } catch (e) {
+        showAlert('signup-alert', 'Server error. Is Flask running?', 'error');
+        btn.disabled = false; btn.textContent = 'Create Account →';
+      }
+    }
+
+    // Enter key support
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        if (document.getElementById('tab-login').classList.contains('active')) doLogin();
+        else doSignup();
+      }
+    });
+
+    // Setup real-time input validation and cleaning
+    document.addEventListener('DOMContentLoaded', () => {
+      {% if show_signup %}
+      switchTab('signup');
+      {% endif %}
+
+      const loginEmail = document.getElementById('login-email');
+      const loginPassword = document.getElementById('login-password');
+
+      loginEmail.addEventListener('input', () => {
+        const val = loginEmail.value.trim();
+        if (val === '') setFieldStatus('login-email', null);
+        else setFieldStatus('login-email', EMAIL_REGEX.test(val));
+      });
+
+      loginPassword.addEventListener('input', () => {
+        const val = loginPassword.value;
+        if (val === '') setFieldStatus('login-password', null);
+        else setFieldStatus('login-password', val.length > 0);
+      });
+
+      const suName = document.getElementById('su-name');
+      const suDept = document.getElementById('su-dept');
+      const suEmail = document.getElementById('su-email');
+      const suVehicle = document.getElementById('su-vehicle');
+      const suPhone = document.getElementById('su-phone');
+      const suPassword = document.getElementById('su-password');
+
+      suName.addEventListener('input', () => {
+        const val = suName.value.trim();
+        if (val === '') setFieldStatus('su-name', null);
+        else setFieldStatus('su-name', NAME_REGEX.test(val));
+      });
+
+      suDept.addEventListener('change', () => {
+        const val = suDept.value;
+        setFieldStatus('su-dept', val !== '');
+      });
+
+      suEmail.addEventListener('input', () => {
+        const val = suEmail.value.trim();
+        if (val === '') setFieldStatus('su-email', null);
+        else setFieldStatus('su-email', EMAIL_REGEX.test(val));
+      });
+
+      suVehicle.addEventListener('input', () => {
+        const val = suVehicle.value.trim();
+        if (val === '') setFieldStatus('su-vehicle', null);
+        else setFieldStatus('su-vehicle', VEHICLE_REGEX.test(val));
+      });
+
+      suPhone.addEventListener('input', () => {
+        suPhone.value = suPhone.value.replace(/\D/g, ''); // keep only numbers
+        const val = suPhone.value.trim();
+        if (val === '') setFieldStatus('su-phone', null);
+        else setFieldStatus('su-phone', PHONE_REGEX.test(val));
+      });
+
+      suPassword.addEventListener('input', () => {
+        const val = suPassword.value;
+        if (val === '') setFieldStatus('su-password', null);
+        else setFieldStatus('su-password', val.length >= 6);
+      });
+    });
+  </script>
+</body>
+
+</html>

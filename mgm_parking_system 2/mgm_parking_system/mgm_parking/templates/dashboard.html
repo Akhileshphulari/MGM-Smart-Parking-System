@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MGM Smart Parking — Dashboard</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+</head>
+
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🅿️</div>
+      <h2>MGM <span>SMART</span> PARKING</h2>
+      <p>MGM College, Nanded</p>
+    </div>
+    <nav class="nav-section">
+      <div class="nav-label">Main</div>
+      <button class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
+        <span class="icon">📊</span> Dashboard
+      </button>
+      <button class="nav-item" onclick="showPage('PARKING')" id="nav-parking">
+        <span class="icon">🅿️</span> Parking Map
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-pill">
+        <div class="user-avatar" id="sidebar-avatar">?</div>
+        <div class="user-info">
+          <div class="name" id="sidebar-name">Loading...</div>
+          <div class="role">Student</div>
+        </div>
+      </div>
+      <button class="nav-item" style="margin-top:8px;color:#f87171" onclick="window.location.href='/logout'">
+        <span class="icon">🚪</span> Logout
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left" style="display:flex;align-items:center;gap:12px">
+        <button id="topbar-back-btn" class="refresh-btn" onclick="showPage('dashboard')"
+          style="display:none;padding:6px 12px;font-size:12px">← Back</button>
+        <div>
+          <h1 id="page-title">Dashboard</h1>
+          <p id="page-sub">MGM College of Engineering & Technology, Nanded</p>
+        </div>
+      </div>
+      <div class="topbar-right" style="display:flex;gap:8px;align-items:center">
+        {% if session.get('role') == 'admin' %}
+        <button class="refresh-btn" onclick="showPage('admin')" id="topbar-nav-admin"
+          style="border-color:#fbbf24;color:#fbbf24">⚙️ Admin Panel</button>
+        {% endif %}
+        <button class="refresh-btn" onclick="showPage('profile')" id="topbar-nav-profile">👤 Profile</button>
+        <button class="refresh-btn" onclick="showPage('history')" id="topbar-nav-history">📋 History</button>
+        <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- ── DASHBOARD PAGE ── -->
+      <div class="page active" id="page-dashboard">
+        <div id="booking-banner" class="booking-banner">
+          <div class="booking-banner-left">
+            <div class="booking-banner-icon" id="banner-icon">🟡</div>
+            <div>
+              <h3 id="banner-slot">Slot — Active</h3>
+              <p id="banner-info">Your vehicle is parked</p>
+              <div id="banner-checkin-status" style="margin-top:6px;font-size:11px;display:flex;align-items:center;gap:6px"></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="confirm-btn" id="banner-checkin-btn" onclick="checkInBooking()" style="background:#10b981;border:1px solid #059669;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:none;border-style:none">📍 Check In Arrival</button>
+            <button class="cancel-btn" onclick="cancelBooking()">✕ Release Slot</button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card total">
+            <div class="icon-badge">🅿️</div>
+            <div class="label">Total Slots</div>
+            <div class="value" id="stat-total">—</div>
+            <div class="sub">MGM Campus capacity</div>
+          </div>
+          <div class="stat-card avail">
+            <div class="icon-badge">✅</div>
+            <div class="label">Available</div>
+            <div class="value" id="stat-avail">—</div>
+            <div class="sub">Ready to park now</div>
+          </div>
+          <div class="stat-card occup">
+            <div class="icon-badge">🚗</div>
+            <div class="label">Occupied</div>
+            <div class="value" id="stat-occup">—</div>
+            <div class="sub">Currently parked</div>
+          </div>
+        </div>
+
+        <div class="occupancy-bar">
+          <div class="occupancy-bar-label">
+            <span>Campus Occupancy</span>
+            <span id="occupancy-pct">0%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" id="bar-fill" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Live Zone Details -->
+        <div class="history-card" style="margin-bottom: 28px;">
+          <h3 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;">📊 Live Zone Details</h3>
+          <div id="dashboard-zone-details" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 12px;">
+            <div style="color:var(--muted);font-size:13px">Loading details...</div>
+          </div>
+        </div>
+
+        <!-- Campus Map Preview -->
+        <div class="map-card">
+          <div class="map-header">
+            <h3>🗺️ Campus Parking Layout — MGM Nanded</h3>
+            <p>Click a zone to jump to its slots</p>
+          </div>
+          <div class="campus-map">
+            <!-- Buildings -->
+            <div class="building-block"
+              style="left:110px;top:20px;width:140px;height:30px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);color:#60a5fa;font-size:10px;">
+              🏫 Main Building
+            </div>
+            <!-- Zone markers -->
+            <div class="zone-marker A" onclick="showZone('A')" title="Zone A — Bikes Only">A</div>
+            <div class="zone-marker B" onclick="showZone('B')" title="Zone B — Bikes Only">B</div>
+            <div class="zone-marker C" onclick="showZone('C')" title="Zone C — Cars Only">C</div>
+            <div class="zone-marker D" onclick="showZone('D')" title="Zone D — Faculty Only">D</div>
+            <!-- Labels -->
+            <div style="position:absolute;left:48px;top:128px;font-size:9px;color:rgba(96,165,250,0.6);">🛵 Bikes Only
+            </div>
+            <div style="position:absolute;left:206px;top:128px;font-size:9px;color:rgba(52,211,153,0.6);">🛵 Bikes Only
+            </div>
+            <div style="position:absolute;left:40px;top:238px;font-size:9px;color:rgba(251,191,36,0.6);">🚗 Cars Only
+            </div>
+            <div style="position:absolute;left:200px;top:238px;font-size:9px;color:rgba(192,132,252,0.6);">🎓 Faculty
+              Only</div>
+            <div style="position:absolute;right:20px;bottom:10px;font-size:10px;color:var(--muted);">📍 MGM Nanded
+              Campus</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── PARKING MAP PAGE ── -->
+      <div class="page" id="page-parking">
+        <div style="margin-bottom:12px">
+          <button class="refresh-btn" onclick="showPage('dashboard')"
+            style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#818cf8">← Back to
+            Dashboard</button>
+        </div>
+        <div id="parking-booking-banner" class="booking-banner">
+          <div class="booking-banner-left">
+            <div class="booking-banner-icon" id="pbanner-icon">🟡</div>
+            <div>
+              <h3 id="pbanner-slot">Slot — Active</h3>
+              <p id="pbanner-info">Your vehicle is parked</p>
+              <div id="pbanner-checkin-status" style="margin-top:6px;font-size:11px;display:flex;align-items:center;gap:6px"></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="confirm-btn" id="pbanner-checkin-btn" onclick="checkInBooking()" style="background:#10b981;border:1px solid #059669;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:none;border-style:none">📍 Check In Arrival</button>
+            <button class="cancel-btn" onclick="cancelBooking()">✕ Release Slot</button>
+          </div>
+        </div>
+
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-dot available"></div> Available
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot partially-booked"></div> Partially Booked
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot occupied"></div> Occupied / Fully Booked
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot mine"></div> My Booking
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot maintenance"></div> Maintenance
+          </div>
+        </div>
+
+        <div id="parking-zones"></div>
+      </div>
+
+      <!-- ── PROFILE PAGE ── -->
+      <div class="page" id="page-profile">
+        <div style="margin-bottom:12px">
+          <button class="refresh-btn" onclick="showPage('dashboard')"
+            style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#818cf8">← Back to
+            Dashboard</button>
+        </div>
+        <div class="profile-grid">
+          <div class="profile-card">
+            <div class="profile-avatar" id="profile-avatar">?</div>
+            <div class="profile-name" id="profile-name">—</div>
+            <div class="profile-email" id="profile-email">—</div>
+            <div class="profile-meta">
+              <div class="meta-row">
+                <span class="meta-icon">🚗</span>
+                <div>
+                  <div class="meta-label">Vehicle No.</div>
+                  <div class="meta-val" id="profile-vehicle">—</div>
+                </div>
+              </div>
+              <div class="meta-row">
+                <span class="meta-icon">📱</span>
+                <div>
+                  <div class="meta-label">Phone</div>
+                  <div class="meta-val" id="profile-phone">—</div>
+                </div>
+              </div>
+              <div class="meta-row">
+                <span class="meta-icon">🏛️</span>
+                <div>
+                  <div class="meta-label">Department</div>
+                  <div class="meta-val" id="profile-dept">—</div>
+                </div>
+              </div>
+              <div class="meta-row">
+                <span class="meta-icon">📅</span>
+                <div>
+                  <div class="meta-label">Member Since</div>
+                  <div class="meta-val" id="profile-since">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="edit-card">
+            <h3>✏️ Edit Profile</h3>
+            <div class="edit-row">
+              <div class="edit-field">
+                <label>Full Name</label>
+                <input type="text" id="edit-name">
+              </div>
+              <div class="edit-field">
+                <label>Department</label>
+                <select id="edit-dept">
+                  <option>Computer Science</option>
+                  <option>Mechanical</option>
+                  <option>Civil</option>
+                  <option>Electrical</option>
+                  <option>Electronics</option>
+                  <option>IT</option>
+                  <option>MBA</option>
+                  <option>MCA</option>
+                  <option>Faculty</option>
+                  <option>Staff</option>
+                </select>
+              </div>
+            </div>
+            <div class="edit-row">
+              <div class="edit-field">
+                <label>Vehicle Number</label>
+                <input type="text" id="edit-vehicle" placeholder="MH-24-XX-0000">
+              </div>
+              <div class="edit-field">
+                <label>Vehicle Type</label>
+                <select id="edit-vehicle-type">
+                  <option value="two_wheeler">🛵 Two Wheeler</option>
+                  <option value="four_wheeler">🚗 Four Wheeler</option>
+                </select>
+              </div>
+              <div class="edit-field">
+                <label>Phone</label>
+                <input type="tel" id="edit-phone">
+              </div>
+            </div>
+            <button class="btn-save" onclick="saveProfile()">💾 Save Changes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── HISTORY PAGE ── -->
+      <div class="page" id="page-history">
+        <div style="margin-bottom:12px">
+          <button class="refresh-btn" onclick="showPage('dashboard')"
+            style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#818cf8">← Back to
+            Dashboard</button>
+        </div>
+        <div class="history-card">
+          <h3>📋 My Booking History</h3>
+          <div id="history-content">
+            <div class="empty-state">
+              <div class="emoji">📭</div>
+              <p>Loading...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ADMIN PAGE ── -->
+      <div class="page" id="page-admin">
+        <div style="margin-bottom:12px">
+          <button class="refresh-btn" onclick="showPage('dashboard')"
+            style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#818cf8">← Back to
+            Dashboard</button>
+        </div>
+
+        <div class="admin-grid" style="display:flex;flex-direction:column;gap:20px">
+          <div class="history-card" style="margin-bottom:0">
+            <h3 style="display:flex;justify-content:space-between;align-items:center">
+              <span>👥 Registered Users</span>
+              <span id="admin-users-count"
+                style="font-size:12px;font-weight:normal;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:12px">0
+                Users</span>
+            </h3>
+            <div id="admin-users-content" style="max-height:300px;overflow-y:auto;margin-top:12px">
+              <div class="empty-state">
+                <div class="emoji">📭</div>
+                <p>Loading...</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="history-card" style="margin-bottom:0">
+            <h3 style="display:flex;justify-content:space-between;align-items:center">
+              <span>📅 All Bookings History</span>
+              <span id="admin-bookings-count"
+                style="font-size:12px;font-weight:normal;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:12px">0
+                Bookings</span>
+            </h3>
+            <div id="admin-bookings-content" style="max-height:400px;overflow-y:auto;margin-top:12px">
+              <div class="empty-state">
+                <div class="emoji">📭</div>
+                <p>Loading...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+
+    </div>
+  </main>
+
+  <!-- BOOK MODAL -->
+  <div class="modal-overlay" id="book-modal">
+    <div class="modal">
+      <h3>🅿️ Book Parking Slot</h3>
+      <p>Confirm your parking spot at MGM Campus</p>
+      <div class="modal-slot-info">
+        <div class="modal-slot-number" id="modal-slot-num">—</div>
+        <div class="modal-slot-type" id="modal-slot-type">—</div>
+      </div>
+      <div style="margin:14px 0;display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:130px">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">📅 Date</label>
+          <input type="date" id="modal-date"
+            style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:inherit;font-size:13px">
+        </div>
+        <div style="flex:1;min-width:130px">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">🕐 Start Time (8AM–7PM)</label>
+          <input type="time" id="modal-time"
+            style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:inherit;font-size:13px">
+        </div>
+        <div style="flex:1.5;min-width:180px">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">⏱️ Duration</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div style="display:flex;align-items:center;gap:4px;flex:1">
+              <input type="number" id="modal-duration-hours" min="0" max="4" value="2"
+                style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:inherit;font-size:13px;text-align:center">
+              <span style="font-size:12px;color:var(--muted)">h</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;flex:1">
+              <input type="number" id="modal-duration-mins" min="0" max="59" step="5" value="0"
+                style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:inherit;font-size:13px;text-align:center">
+              <span style="font-size:12px;color:var(--muted)">m</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="available-periods-title">Available Periods (Click to autofill)</div>
+      <div id="modal-available-periods" class="available-periods-container"></div>
+      <div id="modal-time-summary" style="font-size:12px;color:var(--muted);margin:8px 0 10px;min-height:18px"></div>
+      <div id="modal-token-box" style="display:none"></div>
+      <div class="modal-actions" id="modal-actions">
+        <button id="btn-confirm-booking" class="btn-confirm" onclick="confirmBooking()">✅ Confirm Booking</button>
+        <button class="btn-cancel-modal" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN EDIT USER MODAL -->
+  <div class="modal-overlay" id="admin-edit-user-modal">
+    <div class="modal" style="max-width:500px">
+      <h3>✏️ Edit User Details</h3>
+      <p>Modify user account information</p>
+
+      <input type="hidden" id="edit-user-id">
+
+      <div style="margin:14px 0;display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Full Name</label>
+          <input type="text" id="admin-edit-user-name"
+            style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:inherit;font-size:13px">
+        </div>
+
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Email Address</label>
+          <input type="email" id="admin-edit-user-email"
+            style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:inherit;font-size:13px">
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:130px">
+            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Vehicle No.</label>
+            <input type="text" id="admin-edit-user-vehicle"
+              style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:inherit;font-size:13px">
+          </div>
+          <div style="flex:1;min-width:130px">
+            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Vehicle Type</label>
+            <select id="admin-edit-user-vehicle-type"
+              style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(30,30,50,0.9);color:inherit;font-size:13px">
+              <option value="two_wheeler">🛵 Two Wheeler</option>
+              <option value="four_wheeler">🚗 Four Wheeler</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:130px">
+            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Role</label>
+            <select id="admin-edit-user-role"
+              style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(30,30,50,0.9);color:inherit;font-size:13px">
+              <option value="student">Student</option>
+              <option value="faculty">Faculty</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:130px">
+            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Phone</label>
+            <input type="tel" id="admin-edit-user-phone"
+              style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:inherit;font-size:13px">
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">Department</label>
+          <select id="admin-edit-user-dept"
+            style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(30,30,50,0.9);color:inherit;font-size:13px">
+            <option>Computer Science</option>
+            <option>Mechanical</option>
+            <option>Civil</option>
+            <option>Electrical</option>
+            <option>Electronics</option>
+            <option>IT</option>
+            <option>MBA</option>
+            <option>MCA</option>
+            <option>Faculty</option>
+            <option>Staff</option>
+            <option>Administration</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-confirm" onclick="saveAdminEditUser()">💾 Save Changes</button>
+        <button class="btn-cancel-modal" onclick="closeAdminEditUserModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">
+    <span class="toast-icon" id="toast-icon">✅</span>
+    <span class="toast-msg" id="toast-msg"></span>
+  </div>
+
+  <script>
+    let selectedSlotId = null;
+    let activeBooking = null;
+    let allZones = {};
+    let userVehicleType = '{{ session.get("vehicle_type", "two_wheeler") }}';
+    let userRole = '{{ session.get("role", "student") }}';
+    let currentFilterZone = null;
+
+    // Zone D (faculty/handicapped slots) is open to ALL vehicle types if user is faculty/admin
+    // Zone A & B: bikes only, Zone C: cars only, Zone D: faculty any vehicle
+    const VEHICLE_SLOT_MAP = {
+      two_wheeler: ['two_wheeler'],
+      four_wheeler: ['four_wheeler'],
+    };
+
+    function formatDuration(mins) {
+      if (mins < 60) return `${mins}m`;
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    }
+
+    // ── NAVIGATION ──────────────────────────────────────────────────────────────
+    const pageTitles = {
+      dashboard: ['Dashboard', 'MGM College of Engineering & Technology, Nanded'],
+      parking: ['Parking Map', 'Find & book your slot'],
+      profile: ['My Profile', 'Manage your account'],
+      history: ['Booking History', 'Past and active bookings'],
+      admin: ['Admin Panel', 'System administration & directory details'],
+    };
+
+    function showPage(page) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('page-' + page).classList.add('active');
+      document.getElementById('nav-' + page)?.classList.add('active');
+
+      // Highlight topbar buttons if any
+      document.querySelectorAll('.refresh-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('topbar-nav-' + page)?.classList.add('active');
+
+      const [title, sub] = pageTitles[page] || ['—', ''];
+      document.getElementById('page-title').textContent = title;
+      document.getElementById('page-sub').textContent = sub;
+
+      const backBtn = document.getElementById('topbar-back-btn');
+      if (backBtn) {
+        if (page === 'dashboard') {
+          backBtn.style.display = 'none';
+        } else {
+          backBtn.style.display = 'inline-block';
+        }
+      }
+
+      if (page === 'profile') loadProfile();
+      if (page === 'history') loadHistory();
+      if (page === 'parking') renderZones(null);
+      if (page === 'admin') {
+        loadAdminUsers();
+        loadAdminBookings();
+      }
+    }
+
+    function showZone(zone) {
+      showPage('parking');
+      renderZones(zone);
+    }
+
+    // ── TOAST ────────────────────────────────────────────────────────────────────
+    function toast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      let icon = '✅';
+      if (type === 'error') icon = '❌';
+      if (type === 'warning') icon = '⚠️';
+      document.getElementById('toast-icon').textContent = icon;
+      document.getElementById('toast-msg').textContent = msg;
+      t.className = `toast show ${type}`;
+      setTimeout(() => t.classList.remove('show'), 3500);
+    }
+
+    // ── LOAD ALL ─────────────────────────────────────────────────────────────────
+    async function loadAll() {
+      await Promise.all([loadStats(), loadMyBooking(), loadSlots()]);
+    }
+
+    async function loadStats() {
+      const res = await fetch('/api/stats');
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('stat-total').textContent = data.total;
+        document.getElementById('stat-avail').textContent = data.available;
+        document.getElementById('stat-occup').textContent = data.occupied;
+        const pct = data.total > 0 ? Math.round((data.occupied / data.total) * 100) : 0;
+        document.getElementById('occupancy-pct').textContent = pct + '%';
+        document.getElementById('bar-fill').style.width = pct + '%';
+      }
+    }
+
+    async function loadMyBooking() {
+      const res = await fetch('/api/my_booking');
+      const data = await res.json();
+      activeBooking = data.active_booking;
+
+      const updateBanner = (containerId, prefix) => {
+        const banner = document.getElementById(containerId);
+        if (activeBooking) {
+          banner.classList.add('show');
+          document.getElementById(prefix + 'slot').textContent = `Zone ${activeBooking.zone} — Slot ${activeBooking.slot_number}`;
+          const timeInfo = activeBooking.time_slot ? ` | ${activeBooking.booking_date} at ${activeBooking.time_slot}` : '';
+          document.getElementById(prefix + 'info').textContent = `Token: ${activeBooking.booking_token}${timeInfo}`;
+          
+          const iconEl = document.getElementById(prefix + 'icon');
+          const checkinBtn = document.getElementById(prefix + 'checkin-btn');
+          const statusEl = document.getElementById(prefix + 'checkin-status');
+          
+          if (activeBooking.checked_in) {
+            iconEl.textContent = '🟢';
+            checkinBtn.style.display = 'none';
+            statusEl.innerHTML = `<span style="background:rgba(16,185,129,0.15);color:#10b981;padding:2px 8px;border-radius:4px;font-weight:600">✓ Checked In</span>`;
+          } else {
+            iconEl.textContent = '🟡';
+            if (activeBooking.grace_remaining !== null) {
+              checkinBtn.style.display = 'inline-block';
+              if (activeBooking.grace_remaining > 0) {
+                statusEl.innerHTML = `<span style="background:rgba(245,158,11,0.15);color:#f59e0b;padding:2px 8px;border-radius:4px;font-weight:600">⚠️ Not Checked In — Auto-releasing in ${activeBooking.grace_remaining}m</span>`;
+              } else {
+                statusEl.innerHTML = `<span style="background:rgba(239,68,68,0.15);color:#ef4444;padding:2px 8px;border-radius:4px;font-weight:600">⚠️ Grace Period Expired — Releasing...</span>`;
+              }
+            } else {
+              checkinBtn.style.display = 'none';
+              statusEl.innerHTML = `<span style="background:rgba(255,255,255,0.08);color:var(--muted);padding:2px 8px;border-radius:4px">Check-in opens 15m before start</span>`;
+            }
+          }
+        } else {
+          banner.classList.remove('show');
+        }
+      };
+      
+      updateBanner('booking-banner', 'banner-');
+      updateBanner('parking-booking-banner', 'pbanner-');
+    }
+
+    function updateCountdowns() {
+      if (!activeBooking) return;
+      
+      const now = new Date();
+      
+      ['banner-', 'pbanner-'].forEach(prefix => {
+        const statusEl = document.getElementById(prefix + 'checkin-status');
+        const checkinBtn = document.getElementById(prefix + 'checkin-btn');
+        const iconEl = document.getElementById(prefix + 'icon');
+        const banner = document.getElementById(prefix === 'banner-' ? 'booking-banner' : 'parking-booking-banner');
+        
+        if (!statusEl || !banner || !banner.classList.contains('show')) return;
+        
+        if (activeBooking.checked_in) {
+          // Parse end time (standard YYYY-MM-DDTHH:MM:SS)
+          const endDateTime = new Date(`${activeBooking.booking_date}T${activeBooking.end_time_slot}:00`);
+          const diffMs = endDateTime - now;
+          
+          if (diffMs <= 0) {
+            // Booking duration expired!
+            iconEl.textContent = '🔴';
+            statusEl.innerHTML = `<span style="background:rgba(239,68,68,0.15);color:#ef4444;padding:2px 8px;border-radius:4px;font-weight:600">⏱️ Booking Ended — Releasing...</span>`;
+            if (checkinBtn) checkinBtn.style.display = 'none';
+            
+            // Set activeBooking to null to prevent multiple rapid requests
+            activeBooking = null;
+            setTimeout(() => {
+              loadAll();
+              toast('Slot released successfully', 'success');
+            }, 2000);
+          } else {
+            // Format time remaining
+            const hours = Math.floor(diffMs / (3600 * 1000));
+            const mins = Math.floor((diffMs % (3600 * 1000)) / (60 * 1000));
+            const secs = Math.floor((diffMs % (60 * 1000)) / 1000);
+            
+            const hoursStr = hours > 0 ? `${hours}h ` : '';
+            const minsStr = `${mins}m `;
+            const secsStr = `${secs}s`;
+            
+            iconEl.textContent = '🟢';
+            if (checkinBtn) checkinBtn.style.display = 'none';
+            statusEl.innerHTML = `
+              <span style="background:rgba(16,185,129,0.15);color:#10b981;padding:2px 8px;border-radius:4px;font-weight:600">✓ Checked In</span>
+              <span style="background:rgba(59,130,246,0.15);color:#60a5fa;padding:2px 8px;border-radius:4px;font-weight:600;margin-left:6px">⏱️ Ends in: ${hoursStr}${minsStr}${secsStr}</span>
+            `;
+          }
+        } else {
+          // Parse start and grace end times
+          const startDateTime = new Date(`${activeBooking.booking_date}T${activeBooking.time_slot}:00`);
+          const checkinStart = new Date(startDateTime.getTime() - 15 * 60 * 1000);
+          const graceEnd = new Date(startDateTime.getTime() + 15 * 60 * 1000);
+          
+          if (now < checkinStart) {
+            // Too early to check in
+            iconEl.textContent = '🟡';
+            if (checkinBtn) checkinBtn.style.display = 'none';
+            
+            const diffStartMs = startDateTime - now;
+            const hours = Math.floor(diffStartMs / (3600 * 1000));
+            const mins = Math.floor((diffStartMs % (3600 * 1000)) / (60 * 1000));
+            const hoursStr = hours > 0 ? `${hours}h ` : '';
+            
+            statusEl.innerHTML = `<span style="background:rgba(255,255,255,0.08);color:var(--muted);padding:2px 8px;border-radius:4px">Starts in ${hoursStr}${mins}m • Check-in opens 15m prior</span>`;
+          } else if (now >= checkinStart && now < graceEnd) {
+            // Inside check-in window
+            iconEl.textContent = '🟡';
+            if (checkinBtn) checkinBtn.style.display = 'inline-block';
+            
+            const diffGraceMs = graceEnd - now;
+            const mins = Math.floor(diffGraceMs / (60 * 1000));
+            const secs = Math.floor((diffGraceMs % (60 * 1000)) / 1000);
+            
+            statusEl.innerHTML = `<span style="background:rgba(245,158,11,0.15);color:#f59e0b;padding:2px 8px;border-radius:4px;font-weight:600">⚠️ Not Checked In — Auto-releasing in ${mins}m ${secs}s</span>`;
+          } else {
+            // Grace period expired!
+            iconEl.textContent = '🔴';
+            if (checkinBtn) checkinBtn.style.display = 'none';
+            statusEl.innerHTML = `<span style="background:rgba(239,68,68,0.15);color:#ef4444;padding:2px 8px;border-radius:4px;font-weight:600">⚠️ Grace Period Expired — Releasing...</span>`;
+            
+            // Set activeBooking to null to prevent multiple rapid requests
+            activeBooking = null;
+            setTimeout(() => {
+              loadAll();
+              toast('Your slot has been released automatically', 'warning');
+            }, 2000);
+          }
+        }
+      });
+    }
+
+
+    async function loadSlots() {
+      const res = await fetch('/api/slots');
+      const data = await res.json();
+      if (data.success) {
+        allZones = data.zones;
+        renderZones(currentFilterZone);
+        updateMapPreview();
+        updateDashboardZoneDetails();
+      }
+    }
+
+    function renderZones(filterZone = null) {
+      currentFilterZone = filterZone;
+      const container = document.getElementById('parking-zones');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const zoneNames = {
+        A: { name: 'Zone A — Bikes Only', desc: '🛵 Two-wheelers only (North Side)', icon: '🛵' },
+        B: { name: 'Zone B — Bikes Only', desc: '🛵 Two-wheelers only (East Side)', icon: '🛵' },
+        C: { name: 'Zone C — Cars Only', desc: '🚗 Four-wheelers only', icon: '🚗' },
+        D: { name: 'Zone D — Faculty Only', desc: '🎓 Faculty & staff (any vehicle)', icon: '🎓' },
+      };
+
+      // Zone filter tabs
+      const tabs = `
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <button onclick="renderZones(null)" style="padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.15);background:${!filterZone ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.05)'};color:inherit;cursor:pointer;font-size:12px">All Zones</button>
+      ${['A', 'B', 'C', 'D'].map(z => `<button onclick="renderZones('${z}')" style="padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.15);background:${filterZone === z ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.05)'};color:inherit;cursor:pointer;font-size:12px">Zone ${z}</button>`).join('')}
+    </div>
+  `;
+      container.innerHTML = tabs;
+
+      const zonesToShow = filterZone ? { [filterZone]: allZones[filterZone] || [] } : allZones;
+
+      for (const [zone, slots] of Object.entries(zonesToShow)) {
+        const available = slots.filter(s => s.status === 'available' || s.status === 'partially_booked').length;
+        const occupied = slots.filter(s => s.status === 'occupied').length;
+        const maintenance = slots.filter(s => s.status === 'maintenance').length;
+        const info = zoneNames[zone] || { name: `Zone ${zone}`, desc: '', icon: '🅿️' };
+
+        const div = document.createElement('div');
+        div.className = `parking-zone zone-${zone}`;
+        div.innerHTML = `
+      <div class="zone-header">
+        <div class="zone-title">
+          <div class="zone-badge">${zone}</div>
+          <div>
+            <h3>${info.icon} ${info.name}</h3>
+            <p>${info.desc}</p>
+          </div>
+        </div>
+        <div class="zone-count">
+          <span style="color:var(--success);font-weight:700">${available}</span> Available • 
+          <span style="color:var(--danger);font-weight:700">${occupied}</span> Occupied
+          ${maintenance > 0 ? ` • <span style="color:var(--muted);font-weight:700">${maintenance} Maint.</span>` : ''}
+        </div>
+      </div>
+      <div class="slots-grid">
+        ${slots.map(slot => slotHTML(slot)).join('')}
+      </div>
+    `;
+        container.appendChild(div);
+      }
+    }
+
+    function updateMapPreview() {
+      const zones = ['A', 'B', 'C', 'D'];
+      zones.forEach(z => {
+        const slots = allZones[z] || [];
+        const total = slots.length;
+        if (total === 0) return;
+        const available = slots.filter(s => s.status === 'available' || s.status === 'partially_booked').length;
+        
+        const el = document.querySelector(`.zone-marker.${z}`);
+        if (el) {
+          el.innerHTML = `<span class="zone-letter">${z}</span><span class="zone-occupancy-info">${available}/${total}</span>`;
+          el.title = `Zone ${z} — ${available} of ${total} slots available`;
+          
+          // Class updates for occupancy colors
+          const ratio = available / total;
+          el.className = `zone-marker ${z}`; // reset classes
+          if (ratio === 0) {
+            el.classList.add('fully-booked');
+          } else if (ratio < 0.3) {
+            el.classList.add('partially-full');
+          } else {
+            el.classList.add('mostly-empty');
+          }
+        }
+      });
+    }
+
+    function updateDashboardZoneDetails() {
+      const container = document.getElementById('dashboard-zone-details');
+      if (!container) return;
+      
+      const zoneNames = {
+        A: 'Zone A (North Side — Bikes Only)',
+        B: 'Zone B (East Side — Bikes Only)',
+        C: 'Zone C (South Side — Cars Only)',
+        D: 'Zone D (Faculty Parking)'
+      };
+      const zoneIcons = { A: '🛵', B: '🛵', C: '🚗', D: '🎓' };
+      
+      container.innerHTML = '';
+      ['A', 'B', 'C', 'D'].forEach(z => {
+        const slots = allZones[z] || [];
+        const total = slots.length;
+        const available = slots.filter(s => s.status === 'available' || s.status === 'partially_booked').length;
+        const occupied = slots.filter(s => s.status === 'occupied').length;
+        const partiallyBooked = slots.filter(s => s.status === 'partially_booked').length;
+        const maintenance = slots.filter(s => s.status === 'maintenance').length;
+        const reserved = slots.filter(s => s.status === 'reserved').length;
+        
+        const card = document.createElement('div');
+        card.style.background = 'var(--surface)';
+        card.style.border = '1px solid var(--border)';
+        card.style.borderRadius = '14px';
+        card.style.padding = '16px';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.gap = '8px';
+        
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:6px">
+            <span style="font-weight:700; font-family:'Syne',sans-serif">${zoneIcons[z]} ${z}</span>
+            <span style="font-size:11px; background:rgba(255,255,255,0.06); padding:2px 8px; border-radius:10px">${total} Slots</span>
+          </div>
+          <div style="font-size:11px; color:var(--muted); margin-bottom:4px">${zoneNames[z]}</div>
+          <div style="display:flex; justify-content:space-between; font-size:13px">
+            <span style="color:var(--muted)">Remaining (Available):</span>
+            <span style="color:var(--success); font-weight:700">${available}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:13px">
+            <span style="color:var(--muted)">Occupied:</span>
+            <span style="color:var(--danger); font-weight:700">${occupied}</span>
+          </div>
+          ${partiallyBooked > 0 ? `
+          <div style="display:flex; justify-content:space-between; font-size:13px">
+            <span style="color:var(--muted)">Partially Booked:</span>
+            <span style="color:#f59e0b; font-weight:700">${partiallyBooked}</span>
+          </div>` : ''}
+          ${maintenance > 0 ? `
+          <div style="display:flex; justify-content:space-between; font-size:13px">
+            <span style="color:var(--muted)">Maintenance:</span>
+            <span style="color:var(--muted); font-weight:700">${maintenance}</span>
+          </div>` : ''}
+          ${reserved > 0 ? `
+          <div style="display:flex; justify-content:space-between; font-size:13px">
+            <span style="color:var(--muted)">Reserved:</span>
+            <span style="color:var(--muted); font-weight:700">${reserved}</span>
+          </div>` : ''}
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function slotHTML(slot) {
+      const isMyBooking = activeBooking && activeBooking.slot_id == slot.id;
+      let cls = slot.status;
+      if (isMyBooking) cls = 'my-booking';
+
+      const icons = { two_wheeler: '🛵', four_wheeler: '🚗', faculty: '🎓', handicapped: '♿' };
+      const icon = icons[slot.slot_type] || '🅿️';
+
+      const myTag = isMyBooking ? '<span class="my-tag">MINE</span>' : '';
+
+      // Zone A & B = bikes only, Zone C = cars only, Zone D = faculty/admin any vehicle
+      let allowedTypes;
+      if (userRole === 'admin') {
+        allowedTypes = ['two_wheeler', 'four_wheeler', 'faculty', 'handicapped'];
+      } else if (userRole === 'faculty') {
+        allowedTypes = ['faculty', 'handicapped', 'two_wheeler', 'four_wheeler'];
+      } else {
+        allowedTypes = VEHICLE_SLOT_MAP[userVehicleType] || ['two_wheeler'];
+      }
+
+      const isMaintenance = slot.status === 'maintenance';
+      const isAllowedType = allowedTypes.includes(slot.slot_type);
+      const canBook = !isMaintenance && isAllowedType;
+      const notAllowed = !isMaintenance && !isAllowedType;
+
+      const onclick = canBook ? `onclick="openBookModal(${slot.id}, '${slot.slot_number}', '${slot.slot_type}', '${slot.zone}')"` : '';
+      
+      const bookedText = (slot.booked_intervals && slot.booked_intervals.length > 0) ? ` (Booked: ${slot.booked_intervals.join(', ')})` : '';
+      const titleMsg = notAllowed ? `Not allowed: your vehicle type cannot park here`
+        : isMaintenance ? 'Slot is under maintenance'
+          : slot.status === 'occupied' ? `Fully Booked${bookedText}`
+            : slot.status === 'partially_booked' ? `Partially Booked${bookedText}`
+              : slot.slot_number;
+      const extraCls = notAllowed ? ' restricted' : '';
+
+      return `
+    <div class="slot ${cls}${extraCls}" ${onclick} title="${titleMsg}" style="${notAllowed ? 'opacity:0.4;cursor:not-allowed' : ''}">
+      ${myTag}
+      <span class="slot-icon">${icon}</span>
+      <span class="slot-num">${slot.slot_number}</span>
+    </div>
+  `;
+    }
+
+    // ── BOOKING MODAL ─────────────────────────────────────────────────────────────
+    function openBookModal(id, num, type, zone) {
+      selectedSlotId = id;
+      document.getElementById('modal-slot-num').textContent = `${zone}-${num}`;
+      const typeNames = { two_wheeler: '🛵 Two Wheeler', four_wheeler: '🚗 Four Wheeler', faculty: '🎓 Faculty', handicapped: '♿ Accessible' };
+      document.getElementById('modal-slot-type').textContent = typeNames[type] || type;
+      document.getElementById('modal-token-box').style.display = 'none';
+      document.getElementById('modal-token-box').innerHTML = '';
+      document.getElementById('modal-actions').style.display = 'flex';
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('modal-date').value = today;
+      document.getElementById('modal-date').min = today;
+      document.getElementById('modal-time').value = '';
+      document.getElementById('modal-duration-hours').value = '2';
+      document.getElementById('modal-duration-mins').value = '0';
+      document.getElementById('modal-time-summary').textContent = '';
+      document.getElementById('modal-time').oninput = updateTimeSummary;
+      document.getElementById('modal-time').onchange = updateTimeSummary;
+      document.getElementById('modal-duration-hours').oninput = updateTimeSummary;
+      document.getElementById('modal-duration-mins').oninput = updateTimeSummary;
+      document.getElementById('book-modal').classList.add('show');
+
+      fetchSlotAvailability(id, today);
+    }
+
+    async function fetchSlotAvailability(slotId, dateStr) {
+      const container = document.getElementById('modal-available-periods');
+      if (!container) return;
+
+      container.innerHTML = '<div style="font-size:11px;color:var(--muted)">Checking availability...</div>';
+
+      try {
+        const res = await fetch(`/api/slot_availability?slot_id=${slotId}&booking_date=${dateStr}`);
+        const data = await res.json();
+        if (data.success && data.available_periods && data.available_periods.length > 0) {
+          container.innerHTML = '';
+          data.available_periods.forEach(p => {
+            const tag = document.createElement('div');
+            tag.className = 'available-period-tag';
+            tag.textContent = p.display;
+            tag.onclick = () => {
+              document.getElementById('modal-time').value = p.start_str;
+              const startMins = parseTimeToMinutes(p.start_str);
+              const endMins = parseTimeToMinutes(p.end_str);
+              const availableMins = endMins - startMins;
+              const durationToSet = Math.max(15, Math.min(240, availableMins));
+              const hours = Math.floor(durationToSet / 60);
+              const mins = durationToSet % 60;
+              document.getElementById('modal-duration-hours').value = hours;
+              document.getElementById('modal-duration-mins').value = mins;
+              updateTimeSummary();
+            };
+            container.appendChild(tag);
+          });
+        } else {
+          container.innerHTML = '<div class="available-period-tag empty" style="width:100%;text-align:center;grid-column:1/-1;color:#f87171;border-color:rgba(248,113,113,0.3)">No available periods left for this date. (Booking hours: 8:00 AM - 7:00 PM)</div>';
+        }
+      } catch (err) {
+        container.innerHTML = '<div style="font-size:11px;color:#f87171">Failed to load availability</div>';
+      }
+    }
+
+    function parseTimeToMinutes(timeStr) {
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + m;
+    }
+
+
+    function updateTimeSummary() {
+      const start = document.getElementById('modal-time').value;
+      const hours = parseInt(document.getElementById('modal-duration-hours').value) || 0;
+      const mins = parseInt(document.getElementById('modal-duration-mins').value) || 0;
+      const durMins = hours * 60 + mins;
+      const summary = document.getElementById('modal-time-summary');
+      if (!start) { summary.textContent = ''; return; }
+      const [h, m] = start.split(':').map(Number);
+      
+      const startMins = h * 60 + m;
+      const endMins = startMins + durMins;
+      const endH = Math.floor(endMins / 60);
+      const endM = endMins % 60;
+      
+      if (endH >= 19 && endM > 0 || endH > 19) {
+        summary.textContent = `⚠️ End time ${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')} exceeds 7:00 PM limit`;
+        summary.style.color = '#f87171';
+      } else {
+        summary.textContent = `⏰ ${start} → ${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')} (${formatDuration(durMins)})`;
+        summary.style.color = 'rgba(52,211,153,0.9)';
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('book-modal').classList.remove('show');
+      selectedSlotId = null;
+    }
+
+    async function confirmBooking() {
+      if (!selectedSlotId) return;
+      const bookingDate = document.getElementById('modal-date').value;
+      const timeSlot = document.getElementById('modal-time').value;
+      const hours = parseInt(document.getElementById('modal-duration-hours').value) || 0;
+      const mins = parseInt(document.getElementById('modal-duration-mins').value) || 0;
+      const duration = hours * 60 + mins; // duration in minutes
+      if (!bookingDate || !timeSlot) return toast('Please fill all required fields', 'warning');
+
+      const [h, m] = timeSlot.split(':').map(Number);
+      const startMins = h * 60 + m;
+      const endMins = startMins + duration;
+      if (endMins > 19 * 60) return toast(`End time exceeds 7:00 PM. Reduce duration or start earlier.`, 'error');
+
+      const btn = document.getElementById('btn-confirm-booking');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Booking...';
+      }
+
+      try {
+        const res = await fetch('/api/book', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slot_id: selectedSlotId, booking_date: bookingDate, time_slot: timeSlot, duration })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          document.getElementById('modal-actions').style.display = 'none';
+          const tb = document.getElementById('modal-token-box');
+          tb.style.display = 'block';
+          tb.innerHTML = `
+        <div class="token-box">
+          <div class="token-label">Your Booking Token</div>
+          <div class="token-val">${data.token}</div>
+          <div class="token-note">📍 ${data.zone} — Slot ${data.slot_number} • ${data.booking_date}</div>
+          <div class="token-note" style="margin-top:4px">⏰ ${data.time_slot} → ${data.end_time} (${formatDuration(data.duration)}) • Show at campus gate</div>
+        </div>
+        <button class="btn-cancel-modal" style="width:100%;margin-top:12px" onclick="closeModal();loadAll()">Done ✓</button>
+      `;
+          toast('Slot booked successfully', 'success');
+          loadAll();
+        } else {
+          toast(data.message, data.toast_type || 'error');
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '✅ Confirm Booking';
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        toast('An error occurred during booking. Please try again.', 'error');
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '✅ Confirm Booking';
+        }
+      }
+    }
+
+    async function cancelBooking() {
+      if (!activeBooking) return;
+      if (!confirm(`Release your booking for slot ${activeBooking.slot_number}?`)) return;
+      const res = await fetch('/api/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: activeBooking.id })
+      });
+      const data = await res.json();
+      toast(data.message, data.success ? 'success' : (data.toast_type || 'error'));
+      loadAll();
+    }
+
+    async function checkInBooking() {
+      if (!activeBooking) return;
+      
+      const checkinBtns = [
+        document.getElementById('banner-checkin-btn'),
+        document.getElementById('pbanner-checkin-btn')
+      ];
+      
+      checkinBtns.forEach(btn => {
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'Checking in...';
+        }
+      });
+      
+      try {
+        const res = await fetch('/api/check_in', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          toast(data.message || 'Checked in successfully!', 'success');
+          loadAll();
+        } else {
+          toast(data.message || 'Failed to check in', data.toast_type || 'error');
+        }
+      } catch (err) {
+        toast('Error connecting to check-in service', 'error');
+      } finally {
+        checkinBtns.forEach(btn => {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '📍 Check In Arrival';
+          }
+        });
+      }
+    }
+
+    // Add date change listener
+    document.getElementById('modal-date').addEventListener('change', () => {
+      if (selectedSlotId) {
+        fetchSlotAvailability(selectedSlotId, document.getElementById('modal-date').value);
+      }
+    });
+
+    // ── PROFILE ──────────────────────────────────────────────────────────────────
+    async function loadProfile() {
+      const res = await fetch('/api/profile');
+      const data = await res.json();
+      if (!data.success) return;
+      const u = data.user;
+      const initial = (u.full_name || '?')[0].toUpperCase();
+
+      const setEl = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+      const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+      };
+
+      setEl('profile-avatar', initial);
+      setEl('sidebar-avatar', initial);
+      setEl('sidebar-name', u.full_name);
+      setEl('profile-name', u.full_name);
+      setEl('profile-email', u.email);
+      setEl('profile-vehicle', u.vehicle_no || '—');
+      setEl('profile-phone', u.phone || '—');
+      setEl('profile-dept', u.department || '—');
+      setEl('profile-since', u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+      setVal('edit-name', u.full_name || '');
+      setVal('edit-vehicle', u.vehicle_no || '');
+      setVal('edit-vehicle-type', u.vehicle_type || 'two_wheeler');
+      setVal('edit-phone', u.phone || '');
+      setVal('edit-dept', u.department || 'Computer Science');
+
+      userVehicleType = u.vehicle_type || 'two_wheeler';
+    }
+
+    async function saveProfile() {
+      const payload = {
+        full_name: document.getElementById('edit-name').value.trim(),
+        vehicle_no: document.getElementById('edit-vehicle').value.trim(),
+        vehicle_type: document.getElementById('edit-vehicle-type').value,
+        phone: document.getElementById('edit-phone').value.trim(),
+        department: document.getElementById('edit-dept').value,
+      };
+      const res = await fetch('/api/profile', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      toast(data.message, data.success ? 'success' : 'error');
+      if (data.success) loadProfile();
+    }
+
+    // ── HISTORY ──────────────────────────────────────────────────────────────────
+    async function loadHistory() {
+      const res = await fetch('/api/my_booking');
+      const data = await res.json();
+      const container = document.getElementById('history-content');
+      if (!data.history || data.history.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="emoji">📭</div><p>No bookings yet. Park your vehicle!</p></div>';
+        return;
+      }
+      container.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Slot</th><th>Zone</th><th>Token</th><th>Date</th><th>Time</th><th>Duration</th><th>Status</th>
+      </tr></thead>
+      <tbody>
+        ${data.history.map(b => `
+          <tr>
+            <td><b>${b.slot_number}</b></td>
+            <td>${b.zone}</td>
+            <td style="font-family:monospace;letter-spacing:1px">${b.booking_token}</td>
+            <td>${b.booking_date || new Date(b.start_time).toLocaleDateString('en-IN')}</td>
+            <td>${b.time_slot || '—'}</td>
+            <td>${formatDuration(b.duration)}</td>
+            <td><span class="status-badge ${b.status}">${b.status}</span></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+    }
+
+    // ── ADMIN PANEL DATA ──
+    async function loadAdminUsers() {
+      const container = document.getElementById('admin-users-content');
+      if (!container) return;
+
+      try {
+        const res = await fetch('/api/admin/users');
+        const data = await res.json();
+        if (!data.success) {
+          container.innerHTML = `<div class="empty-state" style="color:#f87171"><div class="emoji">❌</div><p>${data.message || 'Access denied'}</p></div>`;
+          return;
+        }
+
+        document.getElementById('admin-users-count').textContent = `${data.users.length} Users`;
+
+        if (data.users.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="emoji">📭</div><p>No registered users found.</p></div>';
+          return;
+        }
+
+        window.adminUsers = data.users;
+        container.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Vehicle No.</th>
+            <th>Vehicle Type</th>
+            <th>Role</th>
+            <th>Phone</th>
+            <th>Department</th>
+            <th>Created At</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.users.map((u, index) => `
+            <tr>
+              <td><b>${escapeHtml(u.full_name)}</b></td>
+              <td>${escapeHtml(u.email)}</td>
+              <td style="font-family:monospace;letter-spacing:1px">${escapeHtml(u.vehicle_no || '—')}</td>
+              <td>${u.vehicle_type === 'two_wheeler' ? '🛵 Bike' : '🚗 Car'}</td>
+              <td><span class="status-badge ${u.role === 'admin' ? 'active' : 'completed'}">${escapeHtml(u.role)}</span></td>
+              <td>${escapeHtml(u.phone || '—')}</td>
+              <td>${escapeHtml(u.department || '—')}</td>
+              <td style="font-size:11px;color:var(--muted)">${escapeHtml(u.created_at || '—')}</td>
+              <td>
+                <button class="refresh-btn" onclick="openAdminEditUserModal(${index})" style="padding: 2px 8px; font-size: 11px; background: rgba(99,102,241,0.2); border-color: rgba(99,102,241,0.4)">✏️ Edit</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+      } catch (err) {
+        container.innerHTML = '<div class="empty-state" style="color:#f87171"><div class="emoji">❌</div><p>Failed to load users.</p></div>';
+      }
+    }
+
+    async function loadAdminBookings() {
+      const container = document.getElementById('admin-bookings-content');
+      if (!container) return;
+
+      try {
+        const res = await fetch('/api/admin/bookings');
+        const data = await res.json();
+        if (!data.success) {
+          container.innerHTML = `<div class="empty-state" style="color:#f87171"><div class="emoji">❌</div><p>${data.message || 'Access denied'}</p></div>`;
+          return;
+        }
+
+        document.getElementById('admin-bookings-count').textContent = `${data.bookings.length} Bookings`;
+
+        if (data.bookings.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="emoji">📭</div><p>No bookings found in the system.</p></div>';
+          return;
+        }
+
+        container.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Slot</th>
+            <th>Zone</th>
+            <th>User</th>
+            <th>Email</th>
+            <th>Token</th>
+            <th>Date</th>
+            <th>Time Slot</th>
+            <th>Duration</th>
+            <th>Arrival</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.bookings.map(b => `
+            <tr>
+              <td><b>${escapeHtml(b.slot_number)}</b></td>
+              <td>${escapeHtml(b.zone)}</td>
+              <td><b>${escapeHtml(b.user_name)}</b></td>
+              <td>${escapeHtml(b.user_email)}</td>
+              <td style="font-family:monospace;letter-spacing:1px">${escapeHtml(b.booking_token)}</td>
+              <td>${escapeHtml(b.booking_date)}</td>
+              <td>${escapeHtml(b.time_slot)} - ${escapeHtml(b.end_time_slot)}</td>
+              <td>${formatDuration(b.duration)}</td>
+              <td>
+                ${b.checked_in 
+                  ? '<span class="status-badge active">Checked In</span>' 
+                  : (b.status === 'active' 
+                      ? '<span class="status-badge" style="background:rgba(245,158,11,0.12);color:#f59e0b">No Arrival</span>' 
+                      : '<span style="color:var(--muted)">—</span>')
+                }
+              </td>
+              <td><span class="status-badge ${b.status}">${escapeHtml(b.status)}</span></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+      } catch (err) {
+        container.innerHTML = '<div class="empty-state" style="color:#f87171"><div class="emoji">❌</div><p>Failed to load bookings.</p></div>';
+      }
+    }
+
+    // ── ADMIN USER EDIT MODAL HANDLERS ──
+    function openAdminEditUserModal(index) {
+      if (!window.adminUsers || !window.adminUsers[index]) return;
+      const u = window.adminUsers[index];
+
+      document.getElementById('edit-user-id').value = u.id;
+      document.getElementById('admin-edit-user-name').value = u.full_name || '';
+      document.getElementById('admin-edit-user-email').value = u.email || '';
+      document.getElementById('admin-edit-user-vehicle').value = u.vehicle_no || '';
+      document.getElementById('admin-edit-user-vehicle-type').value = u.vehicle_type || 'two_wheeler';
+      document.getElementById('admin-edit-user-role').value = u.role || 'student';
+      document.getElementById('admin-edit-user-phone').value = u.phone || '';
+
+      // Try to match department option or add it if not found
+      const deptSelect = document.getElementById('admin-edit-user-dept');
+      let matched = false;
+      for (let i = 0; i < deptSelect.options.length; i++) {
+        if (deptSelect.options[i].value === u.department) {
+          deptSelect.selectedIndex = i;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched && u.department) {
+        const opt = document.createElement('option');
+        opt.value = u.department;
+        opt.textContent = u.department;
+        deptSelect.appendChild(opt);
+        deptSelect.value = u.department;
+      }
+
+      document.getElementById('admin-edit-user-modal').classList.add('show');
+    }
+
+    function closeAdminEditUserModal() {
+      document.getElementById('admin-edit-user-modal').classList.remove('show');
+    }
+
+    async function saveAdminEditUser() {
+      const userId = document.getElementById('edit-user-id').value;
+      const fullName = document.getElementById('admin-edit-user-name').value.trim();
+      const email = document.getElementById('admin-edit-user-email').value.trim();
+      const vehicleNo = document.getElementById('admin-edit-user-vehicle').value.trim();
+      const vehicleType = document.getElementById('admin-edit-user-vehicle-type').value;
+      const role = document.getElementById('admin-edit-user-role').value;
+      const phone = document.getElementById('admin-edit-user-phone').value.trim();
+      const department = document.getElementById('admin-edit-user-dept').value;
+
+      if (!fullName || !email) {
+        return toast('Name and Email are required', 'error');
+      }
+
+      const btn = document.querySelector('#admin-edit-user-modal .btn-confirm');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      const payload = {
+        id: userId,
+        full_name: fullName,
+        email: email,
+        vehicle_no: vehicleNo,
+        vehicle_type: vehicleType,
+        role: role,
+        phone: phone,
+        department: department
+      };
+
+      try {
+        const res = await fetch('/api/admin/users/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          toast(data.message || 'User updated successfully', 'success');
+          closeAdminEditUserModal();
+          loadAdminUsers();
+          loadProfile(); // Reload session details if the admin edited themselves
+        } else {
+          toast(data.message || 'Failed to update user', 'error');
+        }
+      } catch (err) {
+        toast('Error updating user details', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 Save Changes';
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // ── INIT ─────────────────────────────────────────────────────────────────────
+    // Prevent back button from going to login page
+    history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', () => history.pushState(null, '', window.location.href));
+
+    loadAll();
+    loadProfile();
+    setInterval(loadAll, 30000); // auto-refresh every 30s
+    setInterval(updateCountdowns, 1000); // update live countdowns every 1s
+  </script>
+</body>
+
+</html>
